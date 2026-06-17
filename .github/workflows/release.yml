@@ -255,7 +255,11 @@ jobs:
   build:
     name: Build ${{ matrix.label }}
     needs: [preflight, relay_public_config]
-    if: ${{ !failure() && !cancelled() && needs.preflight.result == 'success' && needs.relay_public_config.result == 'success' }}
+    if: |
+      !failure() && !cancelled() &&
+      needs.preflight.result == 'success' &&
+      needs.relay_public_config.result == 'success' &&
+      needs.preflight.outputs.release_channel == 'nightly'
     runs-on: ${{ matrix.runner }}
     timeout-minutes: 30
     env:
@@ -272,16 +276,6 @@ jobs:
             platform: mac
             target: dmg
             arch: arm64
-          - label: macOS x64
-            runner: blacksmith-12vcpu-macos-26
-            platform: mac
-            target: dmg
-            arch: x64
-          - label: Linux x64
-            runner: blacksmith-32vcpu-ubuntu-2404
-            platform: linux
-            target: AppImage
-            arch: x64
           - label: Windows x64
             runner: blacksmith-32vcpu-windows-2025
             platform: win
@@ -528,7 +522,14 @@ jobs:
   publish_cli:
     name: Publish CLI to npm
     needs: [preflight, relay_public_config, build]
-    if: ${{ !failure() && !cancelled() && needs.preflight.result == 'success' && needs.relay_public_config.result == 'success' && needs.build.result == 'success' }}
+    if: |
+      !failure() && !cancelled() &&
+      needs.preflight.result == 'success' &&
+      needs.relay_public_config.result == 'success' &&
+      (
+        needs.preflight.outputs.release_channel != 'nightly' ||
+        needs.build.result == 'success'
+      )
     runs-on: blacksmith-4vcpu-ubuntu-2404 # blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 10
     permissions:
@@ -584,8 +585,8 @@ jobs:
 
   release:
     name: Publish GitHub Release
-    needs: [preflight, build, publish_cli]
-    if: ${{ !failure() && !cancelled() && needs.preflight.result == 'success' && needs.build.result == 'success' && needs.publish_cli.result == 'success' }}
+    needs: [preflight, publish_cli]
+    if: ${{ !failure() && !cancelled() && needs.preflight.result == 'success' && needs.publish_cli.result == 'success' }}
     runs-on: blacksmith-8vcpu-ubuntu-2404
     timeout-minutes: 10
     steps:
@@ -612,6 +613,7 @@ jobs:
               - --filter=@t3tools/scripts...
 
       - name: Download all desktop artifacts
+        if: needs.preflight.outputs.release_channel == 'nightly'
         uses: actions/download-artifact@v8
         with:
           pattern: desktop-*
@@ -619,6 +621,7 @@ jobs:
           path: release-assets
 
       - name: Merge macOS updater manifests
+        if: needs.preflight.outputs.release_channel == 'nightly'
         run: |
           shopt -s nullglob
           for x64_manifest in release-assets/*-mac-x64.yml; do
@@ -676,7 +679,7 @@ jobs:
             release-assets/*.exe
             release-assets/*.blockmap
             release-assets/*.yml
-          fail_on_unmatched_files: true
+          fail_on_unmatched_files: false
           token: ${{ steps.app_token.outputs.token }}
 
       - name: Publish first release
@@ -696,7 +699,7 @@ jobs:
             release-assets/*.exe
             release-assets/*.blockmap
             release-assets/*.yml
-          fail_on_unmatched_files: true
+          fail_on_unmatched_files: false
           token: ${{ steps.app_token.outputs.token }}
 
   deploy_web:
