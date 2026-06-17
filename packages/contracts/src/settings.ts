@@ -305,6 +305,77 @@ export const GrokSettings = makeProviderSettingsSchema(
 );
 export type GrokSettings = typeof GrokSettings.Type;
 
+export const CommandCodeSettings = makeProviderSettingsSchema(
+  {
+    enabled: Schema.Boolean.pipe(
+      Schema.withDecodingDefault(Effect.succeed(true)),
+      Schema.annotateKey({ providerSettingsForm: { hidden: true } }),
+    ),
+    binaryPath: makeBinaryPathSetting("cmd").pipe(
+      Schema.annotateKey({
+        title: "Binary path",
+        description: "Path to the Command Code CLI binary (`cmd` or `command-code`).",
+        providerSettingsForm: { placeholder: "cmd", clearWhenEmpty: "omit" },
+      }),
+    ),
+    autoAccept: Schema.Boolean.pipe(
+      Schema.withDecodingDefault(Effect.succeed(false)),
+      Schema.annotateKey({
+        title: "Auto-accept",
+        description: "Pass `--auto-accept` so the CLI bypasses permission prompts.",
+        providerSettingsForm: { control: "switch" },
+      }),
+    ),
+    trustProject: Schema.Boolean.pipe(
+      Schema.withDecodingDefault(Effect.succeed(false)),
+      Schema.annotateKey({
+        title: "Trust project",
+        description: "Pass `--trust` to skip the first-run project trust prompt.",
+        providerSettingsForm: { control: "switch" },
+      }),
+    ),
+    skipOnboarding: Schema.Boolean.pipe(
+      Schema.withDecodingDefault(Effect.succeed(true)),
+      Schema.annotateKey({
+        title: "Skip onboarding",
+        description: "Pass `--skip-onboarding` for automated runs.",
+        providerSettingsForm: { control: "switch" },
+      }),
+    ),
+    maxTurns: Schema.Int.pipe(
+      Schema.withDecodingDefault(Effect.succeed(25)),
+      Schema.annotateKey({
+        title: "Max turns",
+        description: "Upper bound for tool calls per prompt (mirrors `--max-turns`).",
+        providerSettingsForm: { placeholder: "25" },
+      }),
+    ),
+    printTimeoutMs: Schema.Int.pipe(
+      Schema.withDecodingDefault(Effect.succeed(180_000)),
+      Schema.annotateKey({
+        title: "Print timeout (ms)",
+        description: "How long to wait for `cmd -p` to finish before failing the turn.",
+        providerSettingsForm: { placeholder: "180000" },
+      }),
+    ),
+    customModels: Schema.Array(Schema.String).pipe(
+      Schema.withDecodingDefault(Effect.succeed([])),
+      Schema.annotateKey({ providerSettingsForm: { hidden: true } }),
+    ),
+  },
+  {
+    order: [
+      "binaryPath",
+      "autoAccept",
+      "trustProject",
+      "skipOnboarding",
+      "maxTurns",
+      "printTimeoutMs",
+    ],
+  },
+);
+export type CommandCodeSettings = typeof CommandCodeSettings.Type;
+
 export const OpenCodeSettings = makeProviderSettingsSchema(
   {
     enabled: Schema.Boolean.pipe(
@@ -395,6 +466,7 @@ export const ServerSettings = Schema.Struct({
     cursor: CursorSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
     grok: GrokSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
     opencode: OpenCodeSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
+    commandCode: CommandCodeSettings.pipe(Schema.withDecodingDefault(Effect.succeed({}))),
   }).pipe(Schema.withDecodingDefault(Effect.succeed({}))),
   // New driver-agnostic instance map. Keyed by `ProviderInstanceId`; values
   // are `ProviderInstanceConfig` envelopes. The driver-specific config blob
@@ -468,6 +540,17 @@ const GrokSettingsPatch = Schema.Struct({
   customModels: Schema.optionalKey(Schema.Array(Schema.String)),
 });
 
+const CommandCodeSettingsPatch = Schema.Struct({
+  enabled: Schema.optionalKey(Schema.Boolean),
+  binaryPath: Schema.optionalKey(TrimmedString),
+  autoAccept: Schema.optionalKey(Schema.Boolean),
+  trustProject: Schema.optionalKey(Schema.Boolean),
+  skipOnboarding: Schema.optionalKey(Schema.Boolean),
+  maxTurns: Schema.optionalKey(Schema.Int),
+  printTimeoutMs: Schema.optionalKey(Schema.Int),
+  customModels: Schema.optionalKey(Schema.Array(Schema.String)),
+});
+
 const OpenCodeSettingsPatch = Schema.Struct({
   enabled: Schema.optionalKey(Schema.Boolean),
   binaryPath: Schema.optionalKey(TrimmedString),
@@ -496,6 +579,7 @@ export const ServerSettingsPatch = Schema.Struct({
       cursor: Schema.optionalKey(CursorSettingsPatch),
       grok: Schema.optionalKey(GrokSettingsPatch),
       opencode: Schema.optionalKey(OpenCodeSettingsPatch),
+      commandCode: Schema.optionalKey(CommandCodeSettingsPatch),
     }),
   ),
   // Whole-map replacement for the new instance config. Patching individual
