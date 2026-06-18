@@ -167,6 +167,16 @@ function createBaseServerConfig(): ServerConfig {
           serverPassword: "",
           customModels: [],
         },
+        commandCode: {
+          enabled: true,
+          binaryPath: "",
+          autoAccept: false,
+          trustProject: false,
+          skipOnboarding: false,
+          maxTurns: 25,
+          printTimeoutMs: 180_000,
+          customModels: [],
+        },
       },
     },
   };
